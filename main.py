@@ -75,7 +75,16 @@ LANGUAGES = {
         "donate_paypal": "Support via PayPal"
     }
 }
+def load_history():
+    try:
+        with open('sale_history.json', 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
 
+def save_history(history_data):
+    with open('sale_history.json', 'w') as f:
+        json.dump(history_data, f)
 def load_json(filename, default):
     if os.path.exists(filename):
         with open(filename, "r", encoding='utf-8') as f:
@@ -260,9 +269,19 @@ class SteamSaleBot(discord.Client):
             print(f"Error scan: {e}")
             return False
 
-    @tasks.loop(hours=12)
+    @tasks.loop(hours=24)
     async def check_sales(self): await self.do_scan()
-
+        current_sales = fetch_steam_sales()
+        current_sale_ids = [str(game['id']) for game in current_sales]
+        history = load_history()
+        cleaned_history = [game_id for game_id in history if game_id in current_sale_ids]
+        new_sales_found = False
+        for game in current_sales:
+            game_id = str(game['id'])
+            if game_id not in cleaned_history:
+                cleaned_history.append(game_id)
+                new_sales_found = True
+                save_history(cleaned_history)
 bot = SteamSaleBot()
 
 @bot.tree.command(name="setup_channel", description="Thiết lập kênh báo kèo")
