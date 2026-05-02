@@ -75,16 +75,8 @@ LANGUAGES = {
         "donate_paypal": "Support via PayPal"
     }
 }
-def load_history():
-    try:
-        with open('sale_history.json', 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return []
 
-def save_history(history_data):
-    with open('sale_history.json', 'w') as f:
-        json.dump(history_data, f)
+# --- HÀM TIỆN ÍCH ---
 def load_json(filename, default):
     if os.path.exists(filename):
         with open(filename, "r", encoding='utf-8') as f:
@@ -96,10 +88,11 @@ def save_json(filename, data):
     with open(filename, "w", encoding='utf-8') as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
+# --- CÁC LỚP GIAO DIỆN (UI) ---
 class DonateView(discord.ui.View):
     def __init__(self, lang):
         super().__init__(timeout=60)
-        self.add_item(discord.ui.Button(label=LANGUAGES[lang]["donate_paypal"], url="https://paypal.me/HieuNguyen73", emoji="💳"))
+        self.add_item(discord.ui.Button(label=LANGUAGES[lang]["donate_paypal"], url=PAYPAL_LINK, emoji="💳"))
 
 class PriceModal(discord.ui.Modal):
     def __init__(self, bot_obj):
@@ -165,6 +158,7 @@ class RoleView(discord.ui.View):
             await interaction.user.add_roles(role)
             await interaction.response.send_message(LANGUAGES[self.lang]["role_ok"].format(role=ROLE_NAME), ephemeral=True)
 
+# --- CLASS CHÍNH CỦA BOT ---
 class SteamSaleBot(discord.Client):
     def __init__(self):
         intents = discord.Intents.default()
@@ -194,13 +188,21 @@ class SteamSaleBot(discord.Client):
         try:
             res = requests.get(f"https://store.steampowered.com/api/featuredcategories/?l={api_lang}&cc=US").json()
             specials = res.get('specials', {}).get('items', [])
+            
+            # === BẮT ĐẦU LOGIC DỌN DẸP JSON ===
+            current_sale_ids = [str(g['id']) for g in specials]
+            expired_ids = [gid for gid in self.history.keys() if gid not in current_sale_ids]
+            for gid in expired_ids:
+                del self.history[gid]
+            # === KẾT THÚC DỌN DẸP ===
+
             new_games = [g for g in specials if str(g['id']) not in self.history and (g.get('final_price', 0)/100) <= max_p]
             
             if not new_games: return False
 
             target_guilds = {str(manual_guild.id): self.guilds_data[str(manual_guild.id)]} if manual_guild else self.guilds_data
 
-            # 1. GỬI BẢNG TỔNG HỢP (SUMMARY)
+            # 1. GỬI BẢNG TỔNG HỢP
             summary = discord.Embed(title=LANGUAGES[lang]["summary_title"], color=discord.Color.red())
             summary.description = LANGUAGES[lang]["summary_desc"] + "\n\n" + "\n".join(
                 [f"{i+1}. **{g['name']}** (-{g['discount_percent']}%) - `${(g['final_price']/100):.2f}`" for i, g in enumerate(new_games[:15])]
@@ -212,14 +214,12 @@ class SteamSaleBot(discord.Client):
                     role = discord.utils.get(chan.guild.roles, name=ROLE_NAME)
                     await chan.send(content=LANGUAGES[lang]["tag_msg"].format(mention=role.mention if role else f"@{ROLE_NAME}"), embed=summary, view=RoleView(lang))
 
-            # 2. GỬI CHI TIẾT GAME (SỐ LIỆU THỰC TẾ)
+            # 2. GỬI CHI TIẾT GAME
             for g in new_games[:5]:
                 g_id = str(g['id'])
-                # Lấy dữ liệu đánh giá thực tế từ API Steam
                 review_api = f"https://store.steampowered.com/appreviews/{g_id}?json=1&language=all"
                 review_res = requests.get(review_api).json()
                 
-                # Tính toán điểm số trên thang điểm 10
                 query_summary = review_res.get('query_summary', {})
                 pos = query_summary.get('total_positive', 0)
                 total = query_summary.get('total_reviews', 0)
@@ -242,8 +242,6 @@ class SteamSaleBot(discord.Client):
                     p = info.get('price_overview', {})
                     price_text = f"~~{p.get('initial_formatted')}~~ **{p.get('final_formatted')}** (-{p.get('discount_percent')}%)"
                     embed.add_field(name=LANGUAGES[lang]["price_label"], value=price_text, inline=True)
-                    
-                    # Hiển thị điểm số thực tế
                     embed.add_field(name=LANGUAGES[lang]["rating_label"], value=f"**{rating_display}**", inline=True)
                     
                     genres = ", ".join([gen['description'] for gen in info.get('genres', [])[:3]])
@@ -270,20 +268,12 @@ class SteamSaleBot(discord.Client):
             return False
 
     @tasks.loop(hours=24)
-    async def check_sales(self): await self.do_scan()
-        current_sales = fetch_steam_sales()
-        current_sale_ids = [str(game['id']) for game in current_sales]
-        history = load_history()
-        cleaned_history = [game_id for game_id in history if game_id in current_sale_ids]
-        new_sales_found = False
-        for game in current_sales:
-            game_id = str(game['id'])
-            if game_id not in cleaned_history:
-                cleaned_history.append(game_id)
-                new_sales_found = True
-                save_history(cleaned_history)
+    async def check_sales(self): 
+        await self.do_scan()
+
 bot = SteamSaleBot()
 
+# --- LỆNH SLASH COMMANDS ---
 @bot.tree.command(name="setup_channel", description="Thiết lập kênh báo kèo")
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_channel(interaction: discord.Interaction):
@@ -322,7 +312,7 @@ async def coming_soon(interaction: discord.Interaction):
         embed.add_field(name=LANGUAGES[bot.config["lang"]]["release_date"], value=f"`{g.get('release_date', 'TBA')}`")
         embed.set_footer(text="via Sale Steam |•© Kirosa")
         await interaction.followup.send(embed=embed)
-# Giữ cho bot sống 24/7 bằng Flask
-keep_alive()
 
+# --- KHỞI ĐỘNG HỆ THỐNG ---
+keep_alive()
 bot.run(TOKEN)
