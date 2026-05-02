@@ -303,5 +303,7 @@ async def coming_soon(interaction: discord.Interaction):
         embed.add_field(name=LANGUAGES[bot.config["lang"]]["release_date"], value=f"`{g.get('release_date', 'TBA')}`")
         embed.set_footer(text="via Sale Steam |•© Kirosa")
         await interaction.followup.send(embed=embed)
+# Giữ cho bot sống 24/7 bằng Flask
+keep_alive()
 
 bot.run(TOKEN)
