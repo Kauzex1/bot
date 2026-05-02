@@ -313,6 +313,12 @@ async def coming_soon(interaction: discord.Interaction):
         embed.set_footer(text="via Sale Steam |•© Kirosa")
         await interaction.followup.send(embed=embed)
 
-# --- KHỞI ĐỘNG HỆ THỐNG ---
+# --- CHÈN ĐOẠN DEBUG NÀY VÀO TRƯỚC keep_alive() ---
+if TOKEN is None:
+    print("❌ LỖI LỚN: Render KHÔNG tìm thấy biến môi trường DISCORD_TOKEN!")
+else:
+    print(f"✅ Render ĐÃ ĐỌC được Token! Bắt đầu với: {TOKEN[:5]}... | Độ dài: {len(TOKEN)} ký tự.")
+# ---------------------------------------------------
+
 keep_alive()
 bot.run(TOKEN)
