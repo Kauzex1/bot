@@ -14,7 +14,7 @@ GUILD_CONFIGS = "guild_configs.json"
 ROLE_NAME = "Sale Hunter"
 
 PAYPAL_LINK = "https://paypal.me/HieuNguyen73" 
-MOMO_QR_URL = "https://your-momo-qr-link.png" # Sư Huynh dán link ảnh QR MoMo vào đây
+MOMO_QR_URL = "https://cdn.discordapp.com/attachments/1129778833122402364/1499943412932153464/677963423_2770384556631864_8826384095108037202_n.png?ex=69f6a2a9&is=69f55129&hm=f1825a370d45533174f9b6b8d956a2f35ad09281272d427ea7afb7c44f55a10e&" # Sư Huynh dán link ảnh QR MoMo vào đây
 
 # --- DỮ LIỆU NGÔN NGỮ ---
 LANGUAGES = {
